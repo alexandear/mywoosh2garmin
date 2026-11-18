@@ -133,9 +133,8 @@ linters:
       disabled-tags:
         - performance
     godoclint:
-      default: all
-      disable:
-        - max-len
+      # Check doc comments that exist (format, starts with the name) without forcing them on every symbol.
+      default: basic
     gosec:
       excludes:
         - G404
@@ -225,7 +224,8 @@ linters:
           disabled: true
         - name: filename-format
           arguments:
-            - ^[_a-z][_a-z0-9]*.go$
+            # e.g. main_test.go
+            - ^[_a-z][_a-z0-9]*\.go$
         - name: flag-parameter
           disabled: true
         - name: forbidden-call-in-wg-go
@@ -355,6 +355,7 @@ linters:
       # G304, G703: the app opens its own temp/config files and the inspect tool opens its argument.
       - linters:
           - gosec
+        # e.g. "G304: Potential file inclusion via variable"
         text: "^G(115|117|304|703):"
 
 issues:
@@ -378,5 +379,7 @@ formatters:
     gofumpt:
       # The module path has no dot, so without this gofumpt treats local imports as std.
       module-path: mywhoosh2garmin
+    golines:
+      max-len: 120
   exclusions:
     generated: lax

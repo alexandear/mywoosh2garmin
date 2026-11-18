@@ -17,6 +17,9 @@ import (
 
 const apiUserAgent = "GCM-iOS-5.19.1.2"
 
+// ErrDuplicate is returned by UploadFIT when Garmin already has the activity.
+var ErrDuplicate = errors.New("duplicate activity (already uploaded to Garmin)")
+
 // Client manages authentication and uploads to Garmin Connect.
 type Client struct {
 	OAuth1   *OAuth1Token
@@ -187,7 +190,7 @@ func (c *Client) doUpload(ctx context.Context, filePath string) (int, []byte, er
 // parseUploadResult checks the upload response for errors.
 func parseUploadResult(status int, body []byte) error {
 	if status == http.StatusConflict {
-		return errors.New("duplicate activity (already uploaded to Garmin)")
+		return ErrDuplicate
 	}
 	if status >= 400 {
 		return fmt.Errorf("upload failed (HTTP %d): %s", status,

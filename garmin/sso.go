@@ -77,18 +77,8 @@ func (s *ssoSession) get(ctx context.Context, reqURL string, useReferer bool) (s
 	return string(body), nil
 }
 
-func (s *ssoSession) post(
-	ctx context.Context,
-	reqURL string,
-	form url.Values,
-	useReferer bool,
-) (string, error) {
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		reqURL,
-		strings.NewReader(form.Encode()),
-	)
+func (s *ssoSession) post(ctx context.Context, reqURL string, form url.Values, useReferer bool) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -116,10 +106,7 @@ func (s *ssoSession) post(
 }
 
 // Login performs the full Garmin SSO login flow and returns OAuth tokens.
-func Login(
-	ctx context.Context,
-	email, password, domain string,
-) (*OAuth1Token, *OAuth2Token, error) {
+func Login(ctx context.Context, email, password, domain string) (*OAuth1Token, *OAuth2Token, error) {
 	if domain == "" {
 		domain = "garmin.com"
 	}
@@ -261,11 +248,7 @@ func fetchConsumer(ctx context.Context) (*oauthConsumer, error) {
 }
 
 // getOAuth1Token exchanges an SSO login ticket for an OAuth1 token.
-func getOAuth1Token(
-	ctx context.Context,
-	consumer *oauthConsumer,
-	ticket, domain string,
-) (*OAuth1Token, error) {
+func getOAuth1Token(ctx context.Context, consumer *oauthConsumer, ticket, domain string) (*OAuth1Token, error) {
 	// OAuth1 signed with consumer-only (empty token)
 	config := oauth1.NewConfig(consumer.ConsumerKey, consumer.ConsumerSecret)
 	token := oauth1.NewToken("", "")
@@ -335,12 +318,7 @@ func exchangeOAuth2(
 		bodyContent = "mfa_token=" + url.QueryEscape(oauth1Token.MFAToken)
 	}
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		reqURL,
-		strings.NewReader(bodyContent),
-	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, strings.NewReader(bodyContent))
 	if err != nil {
 		return nil, err
 	}

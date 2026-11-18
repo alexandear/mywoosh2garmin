@@ -2,6 +2,7 @@
 package mywhoosh
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -185,12 +186,7 @@ func (c *Client) Login(ctx context.Context, email, password string) error {
 		return fmt.Errorf("marshal login payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		loginURL,
-		strings.NewReader(string(jsonBody)),
-	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, strings.NewReader(string(jsonBody)))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -263,12 +259,7 @@ func (c *Client) GetActivities(ctx context.Context) ([]Activity, error) {
 	for {
 		payload := fmt.Sprintf(`{"sortDate":"DESC","page":%d}`, page)
 
-		req, err := http.NewRequestWithContext(
-			ctx,
-			http.MethodPost,
-			activitiesURL,
-			strings.NewReader(payload),
-		)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, activitiesURL, strings.NewReader(payload))
 		if err != nil {
 			return nil, fmt.Errorf("create request: %w", err)
 		}
@@ -345,14 +336,12 @@ func (c *Client) DownloadFitFile(ctx context.Context, activityFileID string) ([]
 	}
 
 	downloadURL := activitiesBase + "rider/profile/download-activity-file"
-	payload := fmt.Sprintf(`{"fileId":%q}`, activityFileID)
+	payload, err := json.Marshal(map[string]string{"fileId": activityFileID})
+	if err != nil {
+		return nil, fmt.Errorf("marshal download payload: %w", err)
+	}
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		downloadURL,
-		strings.NewReader(payload),
-	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, downloadURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}

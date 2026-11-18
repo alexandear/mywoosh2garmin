@@ -69,7 +69,6 @@ type syncedTracker struct {
 	uploaded map[string]string // activityID → upload timestamp
 }
 
-// newSyncedTracker loads synced.json from dir.
 func newSyncedTracker(dir string) *syncedTracker {
 	st := &syncedTracker{
 		path:     filepath.Join(dir, "synced.json"),
@@ -83,7 +82,6 @@ func newSyncedTracker(dir string) *syncedTracker {
 	return st
 }
 
-// IsSynced reports whether the activity was already uploaded.
 func (st *syncedTracker) IsSynced(activityID string) bool {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -92,7 +90,6 @@ func (st *syncedTracker) IsSynced(activityID string) bool {
 	return ok
 }
 
-// MarkSynced records the activity as uploaded and saves synced.json.
 func (st *syncedTracker) MarkSynced(activityID string) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -105,13 +102,15 @@ func (st *syncedTracker) MarkSynced(activityID string) {
 	_ = os.WriteFile(st.path, data, 0o600)
 }
 
-// main builds and runs the GUI.
 func main() {
 	a := app.New()
 	w := a.NewWindow("MyWhoosh2Garmin")
 	w.Resize(fyne.NewSize(720, 700))
 
-	ctx := context.Background()
+	// Cancel in-flight MyWhoosh and Garmin requests when the window closes.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w.SetOnClosed(cancel)
 
 	cfg := loadAppConfig()
 	if cfg.Serial == 0 {
@@ -220,7 +219,7 @@ func main() {
 		}
 
 		if err := client.Login(ctx, email, password); err != nil {
-			return nil, fmt.Errorf("log in to Garmin: %w", err)
+			return nil, fmt.Errorf("garmin login: %w", err)
 		}
 
 		garminClient = client
@@ -302,7 +301,7 @@ func main() {
 			// 5. Upload to Garmin
 			appendLog("  ⬆ Uploading to Garmin Connect…")
 			if err := client.UploadFIT(ctx, outputPath); err != nil {
-				if strings.Contains(err.Error(), "duplicate") {
+				if errors.Is(err, garmin.ErrDuplicate) {
 					appendLog("  ⚠ Already on Garmin (duplicate)")
 					tracker.MarkSynced(activity.ID)
 				} else {
@@ -493,9 +492,7 @@ func main() {
 						}
 					}
 					if unsynced > 0 {
-						uploadAllBtn.SetText(
-							fmt.Sprintf("⬆  Upload All to Garmin (%d remaining)", unsynced),
-						)
+						uploadAllBtn.SetText(fmt.Sprintf("⬆  Upload All to Garmin (%d remaining)", unsynced))
 						uploadAllBtn.Enable()
 					} else {
 						uploadAllBtn.SetText("✓  All synced")
@@ -509,9 +506,7 @@ func main() {
 					continue
 				}
 
-				appendLog(
-					fmt.Sprintf("\n[%d/%d] %s", i+1, len(currentActivities), act.DisplayName()),
-				)
+				appendLog(fmt.Sprintf("\n[%d/%d] %s", i+1, len(currentActivities), act.DisplayName()))
 
 				fileID := act.ActivityFileID
 				if fileID == "" {
@@ -562,7 +557,7 @@ func main() {
 
 				// Upload
 				if err := client.UploadFIT(ctx, outputPath); err != nil {
-					if strings.Contains(err.Error(), "duplicate") {
+					if errors.Is(err, garmin.ErrDuplicate) {
 						appendLog("  ⚠ Already on Garmin (duplicate)")
 						tracker.MarkSynced(act.ID)
 						success++

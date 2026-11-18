@@ -73,7 +73,6 @@ func createTestFitFile(t *testing.T, path string) {
 	}
 }
 
-// TestFixFitFile checks that a MyWhoosh FIT file gets averages, no temperature and the spoofed device.
 func TestFixFitFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	inputPath := filepath.Join(tmpDir, "MyNewActivity-3.8.5.fit")
