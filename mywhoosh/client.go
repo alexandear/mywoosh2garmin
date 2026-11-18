@@ -220,10 +220,7 @@ func (c *Client) Login(ctx context.Context, email, password string) error {
 	}
 
 	if !result.Success {
-		msg := result.Message
-		if msg == "" {
-			msg = "unknown error"
-		}
+		msg := cmp.Or(result.Message, "unknown error")
 
 		return fmt.Errorf("login failed: %s", msg)
 	}

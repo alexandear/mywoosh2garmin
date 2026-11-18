@@ -2,6 +2,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -251,10 +252,7 @@ func main() {
 			appendLog(fmt.Sprintf("⬇ Downloading: %s (%s)…",
 				activity.DisplayName(), activity.FormattedDate()))
 
-			fileID := activity.ActivityFileID
-			if fileID == "" {
-				fileID = activity.ID
-			}
+			fileID := cmp.Or(activity.ActivityFileID, activity.ID)
 			fitData, err := mwClient.DownloadFitFile(ctx, fileID)
 			if err != nil {
 				appendLog("  ❌ Download failed: " + err.Error())
@@ -508,10 +506,7 @@ func main() {
 
 				appendLog(fmt.Sprintf("\n[%d/%d] %s", i+1, len(currentActivities), act.DisplayName()))
 
-				fileID := act.ActivityFileID
-				if fileID == "" {
-					fileID = act.ID
-				}
+				fileID := cmp.Or(act.ActivityFileID, act.ID)
 
 				// Download
 				fitData, err := mwClient.DownloadFitFile(ctx, fileID)

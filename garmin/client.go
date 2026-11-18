@@ -3,6 +3,7 @@ package garmin
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -50,9 +51,7 @@ func (c *Client) Resume(ctx context.Context) error {
 
 	c.OAuth1 = oauth1
 	c.OAuth2 = oauth2
-	if oauth1.Domain != "" {
-		c.Domain = oauth1.Domain
-	}
+	c.Domain = cmp.Or(oauth1.Domain, c.Domain)
 
 	// Token still valid
 	if !oauth2.Expired() {

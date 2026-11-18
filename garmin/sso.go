@@ -1,6 +1,7 @@
 package garmin
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -107,9 +108,7 @@ func (s *ssoSession) post(ctx context.Context, reqURL string, form url.Values, u
 
 // Login performs the full Garmin SSO login flow and returns OAuth tokens.
 func Login(ctx context.Context, email, password, domain string) (*OAuth1Token, *OAuth2Token, error) {
-	if domain == "" {
-		domain = "garmin.com"
-	}
+	domain = cmp.Or(domain, "garmin.com")
 
 	// 1. Fetch OAuth consumer credentials from Garmin's S3 bucket
 	consumer, err := fetchConsumer(ctx)
@@ -217,10 +216,7 @@ func ExchangeForOAuth2(ctx context.Context, oauth1Token *OAuth1Token) (*OAuth2To
 	if err != nil {
 		return nil, fmt.Errorf("fetch consumer: %w", err)
 	}
-	domain := oauth1Token.Domain
-	if domain == "" {
-		domain = "garmin.com"
-	}
+	domain := cmp.Or(oauth1Token.Domain, "garmin.com")
 
 	return exchangeOAuth2(ctx, consumer, oauth1Token, domain)
 }
