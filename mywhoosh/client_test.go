@@ -1,10 +1,12 @@
-package mywhoosh
+package mywhoosh_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"mywhoosh2garmin/mywhoosh"
 )
 
 func TestFormattedDuration(t *testing.T) {
@@ -25,7 +27,7 @@ func TestFormattedDuration(t *testing.T) {
 		t.Run(tt.in, func(t *testing.T) {
 			t.Parallel()
 
-			a := Activity{RideDuration: tt.in}
+			a := mywhoosh.Activity{RideDuration: tt.in}
 			if got := a.FormattedDuration(); got != tt.want {
 				t.Errorf("FormattedDuration(%q) = %q, want %q", tt.in, got, tt.want)
 			}
@@ -36,10 +38,10 @@ func TestFormattedDuration(t *testing.T) {
 func TestFormattedDistance(t *testing.T) {
 	t.Parallel()
 
-	if got := (&Activity{Distance: 42.56}).FormattedDistance(); got != "42.6 km" {
+	if got := (&mywhoosh.Activity{Distance: 42.56}).FormattedDistance(); got != "42.6 km" {
 		t.Errorf("got %q, want %q", got, "42.6 km")
 	}
-	if got := (&Activity{}).FormattedDistance(); got != "" {
+	if got := (&mywhoosh.Activity{}).FormattedDistance(); got != "" {
 		t.Errorf("zero distance: got %q, want empty", got)
 	}
 }
@@ -47,10 +49,10 @@ func TestFormattedDistance(t *testing.T) {
 func TestDisplayName(t *testing.T) {
 	t.Parallel()
 
-	if got := (&Activity{Name: "Alpe du Zwift"}).DisplayName(); got != "Alpe du Zwift" {
+	if got := (&mywhoosh.Activity{Name: "Alpe du Zwift"}).DisplayName(); got != "Alpe du Zwift" {
 		t.Errorf("got %q", got)
 	}
-	if got := (&Activity{}).DisplayName(); got != "Activity" {
+	if got := (&mywhoosh.Activity{}).DisplayName(); got != "Activity" {
 		t.Errorf("empty name: got %q, want %q", got, "Activity")
 	}
 }
@@ -66,22 +68,22 @@ func TestFormattedDate(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		activity Activity
+		activity mywhoosh.Activity
 		want     string
 	}{
 		{
 			name:     "start datetime",
-			activity: Activity{StartDatetime: "2026-03-04T17:30:00.000Z", Date: date},
+			activity: mywhoosh.Activity{StartDatetime: "2026-03-04T17:30:00.000Z", Date: date},
 			want:     "Wed 04 Mar 2026 19:30",
 		},
 		{
 			name:     "invalid start datetime falls back to date",
-			activity: Activity{StartDatetime: "yesterday", Date: date},
+			activity: mywhoosh.Activity{StartDatetime: "yesterday", Date: date},
 			want:     "Mon 01 Dec 2025 10:00",
 		},
 		{
 			name:     "date only",
-			activity: Activity{Date: date},
+			activity: mywhoosh.Activity{Date: date},
 			want:     "Mon 01 Dec 2025 10:00",
 		},
 	}
@@ -94,33 +96,31 @@ func TestFormattedDate(t *testing.T) {
 	}
 }
 
-func TestSaveTokenResume(t *testing.T) {
+func TestResume(t *testing.T) {
 	t.Parallel()
 
-	dir := filepath.Join(t.TempDir(), "nested")
-	c := NewClient(dir)
-	c.token = "access"
-	c.whooshID = "w42"
-	if err := c.saveToken(); err != nil {
+	dir := t.TempDir()
+	token := `{"access_token":"access","whoosh_id":"w42"}`
+	if err := os.WriteFile(filepath.Join(dir, "mywhoosh_token.json"), []byte(token), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	resumed := NewClient(dir)
-	if err := resumed.Resume(); err != nil {
+	c := mywhoosh.NewClient(dir)
+	if err := c.Resume(); err != nil {
 		t.Fatal(err)
 	}
-	if resumed.token != "access" || resumed.whooshID != "w42" || !resumed.IsAuthenticated() {
-		t.Errorf("resumed: got token %q whooshID %q", resumed.token, resumed.whooshID)
+	if !c.IsAuthenticated() {
+		t.Error("resumed client not authenticated")
 	}
 }
 
 func TestResumeErrors(t *testing.T) {
 	t.Parallel()
 
-	if err := NewClient("").Resume(); err == nil {
+	if err := mywhoosh.NewClient("").Resume(); err == nil {
 		t.Error("no token dir: got nil error")
 	}
-	if err := NewClient(t.TempDir()).Resume(); err == nil {
+	if err := mywhoosh.NewClient(t.TempDir()).Resume(); err == nil {
 		t.Error("missing file: got nil error")
 	}
 
@@ -135,7 +135,7 @@ func TestResumeErrors(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, "mywhoosh_token.json"), []byte(content), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			c := NewClient(dir)
+			c := mywhoosh.NewClient(dir)
 			if err := c.Resume(); err == nil {
 				t.Error("got nil error")
 			}
@@ -146,20 +146,10 @@ func TestResumeErrors(t *testing.T) {
 	}
 }
 
-func TestSaveTokenNoDir(t *testing.T) {
-	t.Parallel()
-
-	c := NewClient("")
-	c.token = "access"
-	if err := c.saveToken(); err != nil {
-		t.Errorf("got %v, want nil", err)
-	}
-}
-
 func TestNotAuthenticated(t *testing.T) {
 	t.Parallel()
 
-	c := NewClient(t.TempDir())
+	c := mywhoosh.NewClient(t.TempDir())
 	if c.IsAuthenticated() {
 		t.Error("new client authenticated")
 	}
