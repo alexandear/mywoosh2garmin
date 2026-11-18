@@ -1,8 +1,6 @@
 module mywhoosh2garmin
 
-go 1.24.0
-
-toolchain go1.24.13
+go 1.27.4
 
 require (
 	fyne.io/fyne/v2 v2.7.2
