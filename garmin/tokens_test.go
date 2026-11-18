@@ -1,0 +1,101 @@
+package garmin
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestSaveLoadTokens(t *testing.T) {
+	t.Parallel()
+
+	dir := filepath.Join(t.TempDir(), "nested")
+	oauth1 := &OAuth1Token{OAuthToken: "t1", OAuthTokenSecret: "s1", Domain: "garmin.cn"}
+	oauth2 := &OAuth2Token{AccessToken: "a2", RefreshToken: "r2", ExpiresAt: 123}
+	if err := SaveTokens(dir, oauth1, oauth2); err != nil {
+		t.Fatal(err)
+	}
+
+	got1, got2, err := LoadTokens(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *got1 != *oauth1 {
+		t.Errorf("oauth1: got %+v, want %+v", got1, oauth1)
+	}
+	if *got2 != *oauth2 {
+		t.Errorf("oauth2: got %+v, want %+v", got2, oauth2)
+	}
+}
+
+func TestSaveTokensKeepsOAuth1(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	oauth1 := &OAuth1Token{OAuthToken: "t1"}
+	if err := SaveTokens(dir, oauth1, &OAuth2Token{AccessToken: "old"}); err != nil {
+		t.Fatal(err)
+	}
+	// A refresh saves only the new OAuth2 token.
+	if err := SaveTokens(dir, nil, &OAuth2Token{AccessToken: "new"}); err != nil {
+		t.Fatal(err)
+	}
+
+	got1, got2, err := LoadTokens(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got1.OAuthToken != "t1" || got2.AccessToken != "new" {
+		t.Errorf("got oauth1 %q oauth2 %q, want t1 new", got1.OAuthToken, got2.AccessToken)
+	}
+}
+
+func TestLoadTokensErrors(t *testing.T) {
+	t.Parallel()
+
+	if _, _, err := LoadTokens(t.TempDir()); err == nil {
+		t.Error("empty dir: got nil error")
+	}
+
+	onlyOAuth1 := t.TempDir()
+	if err := SaveTokens(onlyOAuth1, &OAuth1Token{OAuthToken: "t1"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := LoadTokens(onlyOAuth1); err == nil {
+		t.Error("missing oauth2: got nil error")
+	}
+
+	broken := t.TempDir()
+	if err := os.WriteFile(filepath.Join(broken, "oauth1_token.json"), []byte("{broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := LoadTokens(broken); err == nil {
+		t.Error("broken oauth1: got nil error")
+	}
+}
+
+func TestOAuth2TokenExpiry(t *testing.T) {
+	t.Parallel()
+
+	pastSec := time.Now().Add(-time.Hour).Unix()
+	futureSec := time.Now().Add(time.Hour).Unix()
+
+	tok := OAuth2Token{ExpiresAt: pastSec, RefreshTokenExpiresAt: futureSec}
+	if !tok.Expired() || tok.RefreshExpired() {
+		t.Error("access expired, refresh valid: wrong result")
+	}
+
+	tok = OAuth2Token{ExpiresAt: futureSec, RefreshTokenExpiresAt: pastSec}
+	if tok.Expired() || !tok.RefreshExpired() {
+		t.Error("access valid, refresh expired: wrong result")
+	}
+}
+
+func TestBearer(t *testing.T) {
+	t.Parallel()
+
+	if got := (&OAuth2Token{AccessToken: "abc"}).Bearer(); got != "Bearer abc" {
+		t.Errorf("got %q", got)
+	}
+}
