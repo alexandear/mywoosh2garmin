@@ -82,13 +82,19 @@ func TestOAuth2TokenExpiry(t *testing.T) {
 	futureSec := time.Now().Add(time.Hour).Unix()
 
 	tok := OAuth2Token{ExpiresAt: pastSec, RefreshTokenExpiresAt: futureSec}
-	if !tok.Expired() || tok.RefreshExpired() {
-		t.Error("access expired, refresh valid: wrong result")
+	if !tok.Expired() {
+		t.Error("past ExpiresAt: Expired() = false, want true")
+	}
+	if tok.RefreshExpired() {
+		t.Error("future RefreshTokenExpiresAt: RefreshExpired() = true, want false")
 	}
 
 	tok = OAuth2Token{ExpiresAt: futureSec, RefreshTokenExpiresAt: pastSec}
-	if tok.Expired() || !tok.RefreshExpired() {
-		t.Error("access valid, refresh expired: wrong result")
+	if tok.Expired() {
+		t.Error("future ExpiresAt: Expired() = true, want false")
+	}
+	if !tok.RefreshExpired() {
+		t.Error("past RefreshTokenExpiresAt: RefreshExpired() = false, want true")
 	}
 }
 

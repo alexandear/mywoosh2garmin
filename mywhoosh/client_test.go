@@ -22,10 +22,14 @@ func TestFormattedDuration(t *testing.T) {
 		{"45:10", "45:10"},
 	}
 	for _, tt := range tests {
-		a := Activity{RideDuration: tt.in}
-		if got := a.FormattedDuration(); got != tt.want {
-			t.Errorf("FormattedDuration(%q) = %q, want %q", tt.in, got, tt.want)
-		}
+		t.Run(tt.in, func(t *testing.T) {
+			t.Parallel()
+
+			a := Activity{RideDuration: tt.in}
+			if got := a.FormattedDuration(); got != tt.want {
+				t.Errorf("FormattedDuration(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -51,12 +55,14 @@ func TestDisplayName(t *testing.T) {
 	}
 }
 
+// TestFormattedDate is not parallel because it sets time.Local.
 func TestFormattedDate(t *testing.T) {
-	t.Parallel()
+	// A fixed non-UTC zone makes a missing .Local() conversion visible.
+	orig := time.Local                            //nolint:gosmopolitan // saved to restore after the test
+	time.Local = time.FixedZone("UTC+2", 2*60*60) //nolint:gosmopolitan,reassign // see above
+	t.Cleanup(func() { time.Local = orig })       //nolint:gosmopolitan,reassign // restore
 
-	const layout = "Mon 02 Jan 2006 15:04"
-	start := time.Date(2026, time.March, 4, 17, 30, 0, 0, time.UTC)
-	date := time.Date(2025, time.December, 1, 8, 0, 0, 0, time.UTC)
+	date := float64(time.Date(2025, time.December, 1, 8, 0, 0, 0, time.UTC).Unix())
 
 	tests := []struct {
 		name     string
@@ -65,24 +71,26 @@ func TestFormattedDate(t *testing.T) {
 	}{
 		{
 			name:     "start datetime",
-			activity: Activity{StartDatetime: "2026-03-04T17:30:00.000Z", Date: float64(date.Unix())},
-			want:     time.Unix(start.Unix(), 0).Format(layout),
+			activity: Activity{StartDatetime: "2026-03-04T17:30:00.000Z", Date: date},
+			want:     "Wed 04 Mar 2026 19:30",
 		},
 		{
 			name:     "invalid start datetime falls back to date",
-			activity: Activity{StartDatetime: "yesterday", Date: float64(date.Unix())},
-			want:     time.Unix(date.Unix(), 0).Format(layout),
+			activity: Activity{StartDatetime: "yesterday", Date: date},
+			want:     "Mon 01 Dec 2025 10:00",
 		},
 		{
 			name:     "date only",
-			activity: Activity{Date: float64(date.Unix())},
-			want:     time.Unix(date.Unix(), 0).Format(layout),
+			activity: Activity{Date: date},
+			want:     "Mon 01 Dec 2025 10:00",
 		},
 	}
 	for _, tt := range tests {
-		if got := tt.activity.FormattedDate(); got != tt.want {
-			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.activity.FormattedDate(); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -120,17 +128,21 @@ func TestResumeErrors(t *testing.T) {
 		"broken JSON": "{broken",
 		"empty token": `{"access_token":"","whoosh_id":"w42"}`,
 	} {
-		dir := t.TempDir()
-		if err := os.WriteFile(filepath.Join(dir, "mywhoosh_token.json"), []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		c := NewClient(dir)
-		if err := c.Resume(); err == nil {
-			t.Errorf("%s: got nil error", name)
-		}
-		if c.IsAuthenticated() {
-			t.Errorf("%s: client authenticated", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "mywhoosh_token.json"), []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			c := NewClient(dir)
+			if err := c.Resume(); err == nil {
+				t.Error("got nil error")
+			}
+			if c.IsAuthenticated() {
+				t.Error("client authenticated")
+			}
+		})
 	}
 }
 

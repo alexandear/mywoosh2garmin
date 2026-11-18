@@ -32,8 +32,8 @@ func TestParseUploadResult(t *testing.T) {
 	if err == nil || errors.Is(err, ErrDuplicate) {
 		t.Fatalf("500: got %v, want a non-duplicate error", err)
 	}
-	if got := strings.Count(err.Error(), "x"); got != 300 {
-		t.Errorf("500: error contains %d bytes of body, want 300", got)
+	if !strings.HasSuffix(err.Error(), ": "+strings.Repeat("x", 300)) {
+		t.Errorf("500: got %q, want the body truncated to 300 bytes", err)
 	}
 }
 

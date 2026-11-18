@@ -61,13 +61,17 @@ func TestSSORegexps(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		m := tt.re.FindStringSubmatch(tt.in)
-		var got string
-		if m != nil {
-			got = m[1]
-		}
-		if got != tt.want {
-			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := tt.re.FindStringSubmatch(tt.in)
+			var got string
+			if m != nil {
+				got = m[1]
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

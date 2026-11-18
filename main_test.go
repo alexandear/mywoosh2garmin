@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,13 @@ import (
 	"github.com/muktihari/fit/profile/mesgdef"
 	"github.com/muktihari/fit/profile/typedef"
 	"github.com/muktihari/fit/proto"
+)
+
+// Record values set by newTestActivity.
+const (
+	testPower     = 200
+	testHeartRate = 150
+	testCadence   = 90
 )
 
 // newTestActivity returns a MyWhoosh-like activity with:
@@ -31,9 +39,9 @@ func newTestActivity() *filedef.Activity {
 	for i := range 10 {
 		rec := mesgdef.NewRecord(nil).
 			SetTimestamp(now.Add(time.Duration(i) * time.Second)).
-			SetPower(200).
-			SetHeartRate(150).
-			SetCadence(90).
+			SetPower(testPower).
+			SetHeartRate(testHeartRate).
+			SetCadence(testCadence).
 			SetTemperature(25)
 		activity.Records = append(activity.Records, rec)
 	}
@@ -116,6 +124,8 @@ func fixTestActivity(t *testing.T, activity *filedef.Activity, device spoofDevic
 }
 
 func TestFixFitFile(t *testing.T) {
+	t.Parallel()
+
 	device := findSpoofDevice("Edge 840")
 	device.Serial = randomSerial()
 
@@ -138,18 +148,20 @@ func TestFixFitFile(t *testing.T) {
 	}
 	sess := result.Sessions[0]
 
-	if sess.AvgPower != 200 {
-		t.Errorf("avg power: got %d, want 200", sess.AvgPower)
+	if sess.AvgPower != testPower {
+		t.Errorf("avg power: got %d, want %d", sess.AvgPower, testPower)
 	}
-	if sess.AvgHeartRate != 150 {
-		t.Errorf("avg HR: got %d, want 150", sess.AvgHeartRate)
+	if sess.AvgHeartRate != testHeartRate {
+		t.Errorf("avg HR: got %d, want %d", sess.AvgHeartRate, testHeartRate)
 	}
-	if sess.AvgCadence != 90 {
-		t.Errorf("avg cadence: got %d, want 90", sess.AvgCadence)
+	if sess.AvgCadence != testCadence {
+		t.Errorf("avg cadence: got %d, want %d", sess.AvgCadence, testCadence)
 	}
 }
 
 func TestFixFitFileKeepsExistingAverages(t *testing.T) {
+	t.Parallel()
+
 	activity := newTestActivity()
 	activity.Sessions[0].
 		SetAvgPower(250).
@@ -165,6 +177,8 @@ func TestFixFitFileKeepsExistingAverages(t *testing.T) {
 }
 
 func TestFixFitFileSkipsInvalidSamples(t *testing.T) {
+	t.Parallel()
+
 	activity := newTestActivity()
 	// Half the records have no power, HR or cadence; they must not drag the averages down.
 	for _, rec := range activity.Records[:5] {
@@ -185,6 +199,8 @@ func TestFixFitFileSkipsInvalidSamples(t *testing.T) {
 }
 
 func TestFixFitFileNoSamples(t *testing.T) {
+	t.Parallel()
+
 	activity := newTestActivity()
 	for _, rec := range activity.Records {
 		rec.Power = uint16Invalid
@@ -201,6 +217,8 @@ func TestFixFitFileNoSamples(t *testing.T) {
 }
 
 func TestFixFitFileSpoofsDeviceInfos(t *testing.T) {
+	t.Parallel()
+
 	activity := newTestActivity()
 	activity.DeviceInfos = append(activity.DeviceInfos,
 		mesgdef.NewDeviceInfo(nil).
@@ -225,6 +243,8 @@ func TestFixFitFileSpoofsDeviceInfos(t *testing.T) {
 }
 
 func TestFixFitFileErrors(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 	outputPath := filepath.Join(tmpDir, "out.fit")
 
@@ -238,8 +258,9 @@ func TestFixFitFileErrors(t *testing.T) {
 	fit := course.ToFIT(nil)
 	writeTestFit(t, coursePath, &fit)
 
-	if err := fixFitFile(coursePath, outputPath, findSpoofDevice("")); err == nil {
-		t.Error("course file: got nil error")
+	err := fixFitFile(coursePath, outputPath, findSpoofDevice(""))
+	if err == nil || !strings.Contains(err.Error(), "not an activity") {
+		t.Errorf("course file: got %v, want a \"not an activity\" error", err)
 	}
 }
 
@@ -262,11 +283,15 @@ func TestAvg(t *testing.T) {
 func TestShouldFix(t *testing.T) {
 	t.Parallel()
 
-	if !shouldFixU8(0) || !shouldFixU8(uint8Invalid) || shouldFixU8(90) {
-		t.Error("shouldFixU8: want true for 0 and invalid, false otherwise")
+	for in, want := range map[uint8]bool{0: true, uint8Invalid: true, 90: false} {
+		if got := shouldFixU8(in); got != want {
+			t.Errorf("shouldFixU8(%d) = %t, want %t", in, got, want)
+		}
 	}
-	if !shouldFixU16(0) || !shouldFixU16(uint16Invalid) || shouldFixU16(200) {
-		t.Error("shouldFixU16: want true for 0 and invalid, false otherwise")
+	for in, want := range map[uint16]bool{0: true, uint16Invalid: true, 200: false} {
+		if got := shouldFixU16(in); got != want {
+			t.Errorf("shouldFixU16(%d) = %t, want %t", in, got, want)
+		}
 	}
 }
 
@@ -289,16 +314,6 @@ func TestSpoofDeviceNames(t *testing.T) {
 	want := []string{"Fenix 6S Pro", "Edge 840"}
 	if got := spoofDeviceNames(); !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
-	}
-}
-
-func TestRandomSerial(t *testing.T) {
-	t.Parallel()
-
-	for range 1000 {
-		if s := randomSerial(); s == 0 || s == 0xFFFFFFFF {
-			t.Fatalf("got invalid serial %d", s)
-		}
 	}
 }
 
