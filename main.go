@@ -157,20 +157,20 @@ func main() {
 	mwClient.Logf = logFn
 
 	// --- MyWhoosh Credentials ---
-	mwEmailEntry := widget.NewEntry()
+	mwEmailEntry := newEmailEntry()
 	mwEmailEntry.SetPlaceHolder("MyWhoosh email")
 	if cfg.MyWhooshEmail != "" {
-		mwEmailEntry.SetText(cfg.MyWhooshEmail)
+		mwEmailEntry.SetEmail(cfg.MyWhooshEmail)
 	}
 
 	mwPasswordEntry := widget.NewPasswordEntry()
 	mwPasswordEntry.SetPlaceHolder("MyWhoosh password")
 
 	// --- Garmin Credentials ---
-	garminEmailEntry := widget.NewEntry()
+	garminEmailEntry := newEmailEntry()
 	garminEmailEntry.SetPlaceHolder("Garmin email")
 	if cfg.GarminEmail != "" {
-		garminEmailEntry.SetText(cfg.GarminEmail)
+		garminEmailEntry.SetEmail(cfg.GarminEmail)
 	}
 
 	garminPasswordEntry := widget.NewPasswordEntry()
@@ -213,7 +213,7 @@ func main() {
 			return client, nil
 		}
 
-		email := garminEmailEntry.Text
+		email := garminEmailEntry.Email()
 		password := garminPasswordEntry.Text
 		if email == "" || password == "" {
 			return nil, errors.New("enter Garmin email & password for first login")
@@ -379,15 +379,15 @@ func main() {
 			}()
 
 			// Persist config
-			cfg.MyWhooshEmail = mwEmailEntry.Text
-			cfg.GarminEmail = garminEmailEntry.Text
+			cfg.MyWhooshEmail = mwEmailEntry.Email()
+			cfg.GarminEmail = garminEmailEntry.Email()
 			saveAppConfig(cfg)
 
 			// 1. Login to MyWhoosh (try cached session first)
 			if err := mwClient.Resume(); err == nil {
 				appendLog("MyWhoosh session resumed")
 			} else {
-				email := mwEmailEntry.Text
+				email := mwEmailEntry.Email()
 				password := mwPasswordEntry.Text
 				if email == "" || password == "" {
 					appendLog("❌ Enter MyWhoosh email & password")
@@ -412,7 +412,7 @@ func main() {
 			activities, err := mwClient.GetRecentActivities(ctx, 10)
 			if err != nil {
 				// Token may be expired — try fresh login
-				email := mwEmailEntry.Text
+				email := mwEmailEntry.Email()
 				password := mwPasswordEntry.Text
 				if email != "" && password != "" {
 					appendLog("Session may be expired, retrying login…")
